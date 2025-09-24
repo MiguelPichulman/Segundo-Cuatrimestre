@@ -1,0 +1,6 @@
+En una ciudad de 10.000 habitantes adultos el 60% de los adultos escuchan radio, el 40% leen los periódicos y el 20% ven televisión. Entre los que escuchan radio el 40% lee los periódicos y el 10% ven televisión,  el 80% de los que ven televisión, lee los periódicos, y solo el 5% de la población total adultos lee los periódicos, ven televisión y escuchan radio.  
+
+Realizá un diagrama de Venn con unidades, que represente la situación.
+A partir de la información dada, deteminá:  
+¿Cuántos habitantes no escuchan radio y no ven televisión?
+¿Cuántos habitantes sólo escuchan radio?
