@@ -1,0 +1,10 @@
+@startuml
+class ej1.Foto
+class ej1.Pasaporte
+class ej1.Titular
+class ej1.ej1
+class java.util.Date
+ej1.Foto ..> java.util.Date
+ej1.Pasaporte ..> java.util.Date
+ej1.ej1 ..> java.util.Date
+@enduml
