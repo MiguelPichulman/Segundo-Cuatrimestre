@@ -1,0 +1,53 @@
+
+package colecciones;
+
+import java.util.ArrayList;
+
+public class Colecciones {
+
+    public static void main(String[] args) {
+//1. Crear al menos cinco productos con diferentes categorías y agregarlos al 
+//inventario. 
+        Producto p1 = new Producto ("A01", "heladera", 234000, 4, CategoriaProducto.ELECTRONICA);
+        Producto p2 = new Producto ("c01", "juego de mesa y sillas", 210000, 6, CategoriaProducto.HOGAR);
+        Producto p3 = new Producto ("A03", "Smart TV 32'", 178000, 10, CategoriaProducto.ELECTRONICA);
+        Producto p4 = new Producto ("d01", "campera de cuero", 325000, 6, CategoriaProducto.ROPA);
+        Producto p5 = new Producto ("f54", "fernet", 12500, 1, CategoriaProducto.ALIMENTOS);
+        
+        Inventario i = new Inventario();
+        i.agregarProductos(p1);
+        i.agregarProductos(p2);
+        i.agregarProductos(p3);
+        i.agregarProductos(p4);
+        i.agregarProductos(p5);
+        
+//2. Listar todos los productos mostrando su información y categoría.  
+        i.listaProductos();
+        
+//3. Buscar un producto por ID y mostrar su información.  
+        if(i.buscarProductoPorId("A43")!=null){
+            (i.buscarProductoPorId("A01")).mostrarInfo();
+        }else{
+            System.out.println("no existe");
+        }
+//4. Filtrar y mostrar productos que pertenezcan a una categoría específica.
+        CategoriaProducto c = CategoriaProducto.ELECTRONICA;
+        i.filtrarPorCategoria(c);
+        
+//5. Eliminar un producto por su ID y listar los productos restantes.  
+        i.eliminarProducto("A01");
+        i.listaProductos();
+        
+//6. Actualizar el stock de un producto existente. 
+        i.actualizarStock("f54", 0);
+   
+//7. Mostrar el total de stock disponible.  
+        i.obtenerTotalStock();
+//8. Obtener y mostrar el producto con mayor stock. 
+        i.obtenerProductoConMayorStock();
+//9. Filtrar productos con precios entre $1000 y $3000.  
+//10. Mostrar las categorías disponibles con sus descripciones. 
+        
+    }
+    
+}
