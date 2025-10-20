@@ -1,0 +1,31 @@
+A: Good afternoon, Maria. Thank you for coming to the office. Can you tell me a little about yourself?
+
+B: Good afternoon. I am happy to be here. Well, I am a programming student specializing in web development. I am very motivated to learn more and grow as a developer. Currently, I am learning advanced Python and I enjoy working in a team.
+
+A: That sounds great. What experiences do you have in the programming field?
+
+B: I have worked on several academic projects. For example, last year, I finished a project about creating an e-commerce platform for a local business. I created the database structure and worked on the back-end logic. Also, I have used HTML, CSS, and JavaScript in most of my projects.
+
+A: Very interesting. Have you ever worked in a programming company? When?
+
+B: No, I have never had a formal job at a programming company, but I have worked freelance on a few simple website design projects. I finished my last freelance project in May. I have learned a lot from those experiences.
+
+A: I see. Now, let’s talk about your skills. What are your strengths?
+
+B: I believe my main strength is that I like solving problems. Also, I am very reliable and eager to learn new technologies. I am always looking for ways to improve my code.
+
+A: And what about your limitations? What are your weaknesses?
+
+B: Sometimes, I tend to be a bit of a perfectionist, which means I might spend too much time on a small task. However, I am learning to manage my time better by using project management tools.
+
+A: That’s a good answer. The programming world can be stressful. How do you handle stress?
+
+B: When deadlines are tight, I focus on breaking the big task into smaller, manageable steps. I also make sure to take short breaks to keep a steady pace. Clear communication with the team is also essential for me.
+
+A: One final question: Why should we hire you?
+
+B: You should hire me because I am dedicated, I want to learn more, and I am ready to work hard to contribute to your team. My basic programming knowledge in Python and JavaScript makes me a great fit for the Junior Web Assistant position. I am available to start immediately.
+
+A: Thank you for your time, Maria. We will be in touch in a few days.
+
+B: Thank you for the opportunity. I look forward to your call.
