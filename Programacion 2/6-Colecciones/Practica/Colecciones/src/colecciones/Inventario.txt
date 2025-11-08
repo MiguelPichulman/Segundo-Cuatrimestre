@@ -69,7 +69,7 @@ public class Inventario {
     }
     public void obtenerProductoConMayorStock(){
         int max= -1;
-        Producto aux = null;
+        Producto aux = new Producto();
         for(Producto p : productos){
             if(p.getCantidad()>max){
                 max=p.getCantidad();
@@ -82,7 +82,7 @@ public class Inventario {
     public void filtrarProductosPorPrecio(double min, double max){
         for (Producto p : productos) {
             if((p.getPrecio()>min)&&(p.getPrecio()<max)){
-                p.mostrarInfo();
+                System.out.println(p);
             }
         }       
     }

@@ -25,7 +25,7 @@ public class Colecciones {
         i.listaProductos();
         
 //3. Buscar un producto por ID y mostrar su información.  
-        if(i.buscarProductoPorId("A01")!=null){
+        if(i.buscarProductoPorId("A43")!=null){
             (i.buscarProductoPorId("A01")).mostrarInfo();
         }else{
             System.out.println("no existe");
@@ -46,7 +46,7 @@ public class Colecciones {
 //8. Obtener y mostrar el producto con mayor stock. 
         i.obtenerProductoConMayorStock();
 //9. Filtrar productos con precios entre $1000 y $3000.
-        i.filtrarProductosPorPrecio(200000, 300000);
+        
 //10. Mostrar las categorías disponibles con sus descripciones.
         i.mostrarCategoriasDisponibles();
         
