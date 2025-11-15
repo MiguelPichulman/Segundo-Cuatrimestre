@@ -1,24 +1,33 @@
-
 package entities;
 
-public class Base {
-    private int id;
-    private boolean eliminado;
 
+/*
+Clase abstracta de la que heredan otras entidades. Centraliza los campos comunes
+*/
+public abstract class Base {
+    private long id;
+    private boolean eliminado; //baja logica
+    
+    /*
+    Constructores
+    */
     protected Base() {
         this.eliminado= false;
     }
 
-    public Base(int id, boolean eliminado) {
+    public Base(long id, boolean eliminado) {
         this.id = id;
         this.eliminado = eliminado;
     }
-
-    public int getId() {
+    
+    /*
+    Getters y setters
+    */
+    public long getId() {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(long id) {
         this.id = id;
     }
 
@@ -29,6 +38,4 @@ public class Base {
     public void setEliminado(boolean eliminado) {
         this.eliminado = eliminado;
     }  
-
-
 }

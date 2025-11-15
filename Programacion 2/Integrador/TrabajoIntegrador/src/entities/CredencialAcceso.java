@@ -7,9 +7,9 @@ public class CredencialAcceso extends Base {
     private String hashPassword;
     private String salt;
     private LocalDateTime ultimoCambio;
-    private boolean requiereReset;
+    private boolean requiereReset; 
 
-    public CredencialAcceso(String hashPassword, String salt, LocalDateTime ultimoCambio, boolean requiereReset, int id) {
+    public CredencialAcceso(long id ,String hashPassword, String salt, LocalDateTime ultimoCambio, boolean requiereReset) {
         super(id, false);
         this.hashPassword = hashPassword;
         this.salt = salt;

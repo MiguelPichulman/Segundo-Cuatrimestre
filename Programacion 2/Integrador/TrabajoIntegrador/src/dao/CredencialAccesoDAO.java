@@ -6,13 +6,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Implementación del DAO para la entidad CredencialAcceso usando JDBC y PreparedStatement.
- * NOTA: Esta clase NO maneja la clave foránea 'usuario_id' requerida para la relación 1:1.
- * Dicha lógica debe ser manejada por la Capa Service.
+ * Implementacion del DAO para CredencialAcceso
  */
-public class CredencialAccesoDAO implements GenericDao<CredencialAcceso> {
+public class CredencialAccesoDAO implements GenericDAO<CredencialAcceso> {
 
-    // Constantes SQL
+    // Constantes
     private static final String INSERT =
             "INSERT INTO CredencialAcceso (hashPassword, salt, ultimoCambio, requiereReset, eliminado) " +
             "VALUES (?, ?, ?, ?, ?)";
@@ -30,122 +28,169 @@ public class CredencialAccesoDAO implements GenericDao<CredencialAcceso> {
     private static final String DELETE_LOGICO =
             "UPDATE CredencialAcceso SET eliminado = TRUE WHERE id = ?";
 
-    @Override
-    public CredencialAcceso crear(CredencialAcceso credencial, Connection connection) throws Exception {
-        // Se utiliza try-with-resources para asegurar que el PreparedStatement se cierre automáticamente
-        try (PreparedStatement stmt = connection.prepareStatement(INSERT, Statement.RETURN_GENERATED_KEYS)) {
-
-            // Mapeo de parámetros
-            int index = 1;
-            stmt.setString(index++, credencial.getHashPassword());
-            stmt.setString(index++, credencial.getSalt());
-            
-            // Conversión de java.time.LocalDateTime a java.sql.Timestamp
-            if (credencial.getUltimoCambio() != null) {
-                stmt.setTimestamp(index++, Timestamp.valueOf(credencial.getUltimoCambio()));
-            } else {
-                stmt.setNull(index++, Types.TIMESTAMP);
-            }
-            
-            stmt.setBoolean(index++, credencial.isRequiereReset());
-            stmt.setBoolean(index++, credencial.isEliminado()); // Baja lógica inicial
-            
-            stmt.executeUpdate();
-
-            // Obtener el ID generado por la base de datos
-            try (ResultSet rs = stmt.getGeneratedKeys()) {
-                if (rs.next()) {
-                    credencial.setId(rs.getInt(1));
-                } else {
-                    throw new SQLException("Creación de CredencialAcceso falló, no se obtuvo el ID generado.");
-                }
-            }
-        }
-        return credencial; // Retorna la entidad con el ID asignado
+    /**
+     * Constructor vacio
+     */
+    public CredencialAccesoDAO() {
     }
 
+    /**
+     * CREA una CredencialAcceso, abriendo y cerrando su propia conexion
+     * El ID sera generado por la base de datos
+     */
     @Override
-    public CredencialAcceso leer(long id, Connection connection) throws Exception {
-        try (PreparedStatement stmt = connection.prepareStatement(SELECT_BY_ID)) {
+    public void crear(CredencialAcceso credencial, Connection conn) throws Exception {
+        try (PreparedStatement stmt = conn.prepareStatement(INSERT, Statement.RETURN_GENERATED_KEYS)) {
+            setCrearParameters(stmt, credencial);
+            stmt.executeUpdate();
+            setGeneratedId(stmt, credencial);
+        } catch (SQLException e) {
+            throw new Exception("Error en DAO al crear la credencial: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * LEE una CredencialAcceso por ID, abriendo y cerrando su propia conexion
+     */
+    @Override
+    public CredencialAcceso leer(long id, Connection conn) throws Exception {
+        try (PreparedStatement stmt = conn.prepareStatement(SELECT_BY_ID)) {
             stmt.setLong(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
                     return mapearCredencialAcceso(rs);
                 }
             }
+        } catch (SQLException e) {
+            throw new Exception("Error en DAO al leer la credencial: " + e.getMessage(), e);
         }
-        return null; // Retorna null si no existe o tiene baja lógica
+        return null;
     }
 
+    /**
+     * LEE TODAS las CredencialAcceso (activas), abriendo y cerrando su propia conexion
+     */
     @Override
-    public List<CredencialAcceso> leerTodos(Connection connection) throws Exception {
+    public List<CredencialAcceso> leerTodos(Connection conn) throws Exception {
         List<CredencialAcceso> credenciales = new ArrayList<>();
-        try (PreparedStatement stmt = connection.prepareStatement(SELECT_ALL);
+        try (PreparedStatement stmt = conn.prepareStatement(SELECT_ALL);
              ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
                 credenciales.add(mapearCredencialAcceso(rs));
             }
+        } catch (SQLException e) {
+            throw new Exception("Error en DAO al leer todas las credenciales: " + e.getMessage(), e);
         }
         return credenciales;
     }
 
+    /**
+     * ACTUALIZA una CredencialAcceso, abriendo y cerrando su propia conexion
+     */
     @Override
-    public CredencialAcceso actualizar(CredencialAcceso credencial, Connection connection) throws Exception {
-        try (PreparedStatement stmt = connection.prepareStatement(UPDATE)) {
-            
-            // Mapeo de parámetros
-            int index = 1;
-            stmt.setString(index++, credencial.getHashPassword());
-            stmt.setString(index++, credencial.getSalt());
-            
-            if (credencial.getUltimoCambio() != null) {
-                stmt.setTimestamp(index++, Timestamp.valueOf(credencial.getUltimoCambio()));
-            } else {
-                stmt.setNull(index++, Types.TIMESTAMP);
-            }
-            
-            stmt.setBoolean(index++, credencial.isRequiereReset());
-            
-            // Clave del WHERE
-            stmt.setInt(index++, credencial.getId());
-
+    public void actualizar(CredencialAcceso credencial, Connection conn) throws Exception {
+        if (credencial == null || credencial.getId() == 0) {
+            throw new IllegalArgumentException("La credencial a actualizar no puede ser nula o no tener un ID válido.");
+        }
+        
+        try (PreparedStatement stmt = conn.prepareStatement(UPDATE)) {
+            setUpdateParameters(stmt, credencial);
             int affectedRows = stmt.executeUpdate();
             
             if (affectedRows == 0) {
-                 throw new SQLException("Actualización de CredencialAcceso falló, ID: " + credencial.getId() + " no encontrado o con baja lógica.");
+                 throw new SQLException("Actualización de CredencialAcceso falló, ID: " + credencial.getId() + " no encontrado o ya eliminado.");
             }
+        } catch (SQLException e) {
+            throw new Exception("Error en DAO al actualizar la credencial: " + e.getMessage(), e);
         }
-        return credencial; // Retorna la entidad actualizada
     }
 
+    /**
+     * ELIMINA (logicamente) una CredencialAcceso, abriendo y cerrando su propia conexion
+     */
     @Override
-    public void eliminar(long id, Connection connection) throws Exception {
-        try (PreparedStatement stmt = connection.prepareStatement(DELETE_LOGICO)) {
+    public void eliminar(long id, Connection conn) throws Exception {
+        if (id == 0) {
+            throw new IllegalArgumentException("El ID a eliminar no puede ser 0.");
+        }
+        
+        try (PreparedStatement stmt = conn.prepareStatement(DELETE_LOGICO)) {
             stmt.setLong(1, id);
             int affectedRows = stmt.executeUpdate();
             
             if (affectedRows == 0) {
                  throw new SQLException("Eliminación lógica de CredencialAcceso falló, ID: " + id + " no encontrado.");
             }
+        } catch (SQLException e) {
+            throw new Exception("Error en DAO al eliminar lógicamente la credencial: " + e.getMessage(), e);
         }
     }
 
+    // --- METODOS HELPER (Iguales al patron de UsuarioDAO) ---
+
     /**
-     * Método auxiliar para mapear un ResultSet a un objeto CredencialAcceso.
-     * @param rs El ResultSet de la consulta.
-     * @return La entidad CredencialAcceso.
-     * @throws SQLException 
+     * Metodo helper para establecer los parametros de un INSERT
+     */
+    private void setCrearParameters(PreparedStatement stmt, CredencialAcceso credencial) throws SQLException {
+        int index = 1;
+        stmt.setString(index++, credencial.getHashPassword());
+        stmt.setString(index++, credencial.getSalt());
+        
+        if (credencial.getUltimoCambio() != null) {
+            stmt.setTimestamp(index++, Timestamp.valueOf(credencial.getUltimoCambio()));
+        } else {
+            stmt.setNull(index++, Types.TIMESTAMP);
+        }
+        
+        stmt.setBoolean(index++, credencial.isRequiereReset());
+        stmt.setBoolean(index++, credencial.isEliminado()); // Baja lógica inicial
+    }
+    
+    /**
+     * Metodo helper para establecer los parametros de un UPDATE
+     */
+    private void setUpdateParameters(PreparedStatement stmt, CredencialAcceso credencial) throws SQLException {
+        int index = 1;
+        stmt.setString(index++, credencial.getHashPassword());
+        stmt.setString(index++, credencial.getSalt());
+        
+        if (credencial.getUltimoCambio() != null) {
+            stmt.setTimestamp(index++, Timestamp.valueOf(credencial.getUltimoCambio()));
+        } else {
+            stmt.setNull(index++, Types.TIMESTAMP);
+        }
+        
+        stmt.setBoolean(index++, credencial.isRequiereReset());
+        
+        // --- Parametro del WHERE ---
+        stmt.setLong(index++, credencial.getId());
+    }
+
+    /**
+     * Establece el ID autogenerado en el objeto CredencialAcceso
+     */
+    private void setGeneratedId(PreparedStatement stmt, CredencialAcceso credencial) throws SQLException {
+        try (ResultSet rs = stmt.getGeneratedKeys()) {
+            if (rs.next()) {
+                credencial.setId(rs.getLong(1));
+            } else {
+                throw new SQLException("La inserción de la credencial falló, no se obtuvo ID generado.");
+            }
+        }
+    }
+    
+    /**
+     * Metodo auxiliar para mapear un ResultSet a un objeto CredencialAcceso
      */
     private CredencialAcceso mapearCredencialAcceso(ResultSet rs) throws SQLException {
         CredencialAcceso credencial = new CredencialAcceso();
         
-        credencial.setId(rs.getInt("id"));
+        credencial.setId(rs.getLong("id"));
         credencial.setEliminado(rs.getBoolean("eliminado"));
         credencial.setHashPassword(rs.getString("hashPassword"));
         credencial.setSalt(rs.getString("salt"));
         
-        // Conversión de java.sql.Timestamp a java.time.LocalDateTime
         Timestamp ultimoCambioTs = rs.getTimestamp("ultimoCambio");
         if (ultimoCambioTs != null) {
              credencial.setUltimoCambio(ultimoCambioTs.toLocalDateTime());
@@ -153,10 +198,6 @@ public class CredencialAccesoDAO implements GenericDao<CredencialAcceso> {
        
         credencial.setRequiereReset(rs.getBoolean("requiereReset"));
         
-        // NOTA: El campo 'usuario_id' (FK) NO se mapea a la entidad 
-        // ya que la relación es unidireccional (Usuario -> CredencialAcceso).
-        
         return credencial;
     }
-
 }

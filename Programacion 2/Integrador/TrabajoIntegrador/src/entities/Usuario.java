@@ -3,20 +3,23 @@ package entities;
 
 import java.time.LocalDateTime;
 
+/*
+Representa la entidad "A", el Usuario. Contiene sus datos personales y la referencia 1-a-1 a su credencial
+*/
 public class Usuario extends Base{
-    private CredencialAcceso credencial_id;
     private String username;
     private String email;
     private boolean activo;
     private LocalDateTime fechaRegistro;
-    private long credencialId;
-    
-
+    private CredencialAcceso credencialId;  
+    /*
+    Constructores
+    */
     public Usuario() {
         super();
     }
 
-    public Usuario(int id, String username, String email, boolean activo, LocalDateTime fechaRegistro, long credencialId) {
+    public Usuario(long id, String username, String email, boolean activo, LocalDateTime fechaRegistro, CredencialAcceso credencialId) {
         super(id,false);
         this.username = username;
         this.email = email;
@@ -24,7 +27,10 @@ public class Usuario extends Base{
         this.fechaRegistro = fechaRegistro;
         this.credencialId = credencialId;
     }
-
+    
+    /*
+    Getters y setters
+    */
     public String getUsername() {
         return username;
     }
@@ -57,39 +63,16 @@ public class Usuario extends Base{
         this.fechaRegistro = fechaRegistro;
     }
 
-    public CredencialAcceso getCredencial_id() {
-        return credencial_id;
-    }
-
-    public void setCredencial_id(CredencialAcceso credencial_id) {
-        this.credencial_id = credencial_id;
-    }
-
-    public long getCredencialId() {
+    public CredencialAcceso getCredencialId() {
         return credencialId;
     }
 
-    public void setCredencialId(long credencialId) {
+    public void setCredencialId(CredencialAcceso credencialId) {
         this.credencialId = credencialId;
     }
-    
 
     @Override
     public String toString() {
-        return "Usuario{" + "username=" + username + ", email=" + email + ", activo=" + activo + ", fechaRegistro=" + fechaRegistro + ", credencial_id=" + credencial_id + '}';
+        return "Usuario{" + "username=" + username + ", email=" + email + ", activo=" + activo + ", fechaRegistro=" + fechaRegistro + ", credencial_id=" + credencialId + '}';
     }
-
-    //ver !!!
-//    @Override
-//    public boolean equals(Object o){
-//        if (this == o) return true;
-//        if (o == null || getClass() != o.getClass()) return false;
-//        Usuario usuario = (Usuario) o;
-//        return getId() == usuario.getId();
-//    }
-//     @Override
-//    public int hashCode() {
-//        return Objects.hash(getId());
-//    }
-    
 }

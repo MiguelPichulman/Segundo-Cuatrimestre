@@ -2,212 +2,265 @@ package service;
 
 import config.DatabaseConnection;
 import dao.CredencialAccesoDAO;
-import dao.GenericDao;
-import entities.Usuario;
+import dao.UsuarioDAO;
 import entities.CredencialAcceso;
+import entities.Usuario;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
- * Implementación del servicio de negocio para la entidad Usuario (A).
- * Responsable de la gestión de transacciones (commit/rollback) que involucran
- * a Usuario y CredencialAcceso, aplicando las reglas de negocio.
- * * Patrón: Service Layer con Transacciones Obligatorias.
+ * Servicio para la entidad Usuario (A-Service)
+ * Orquesta las operaciones transaccionales compuestas (Usuario y CredencialAcceso)
+ * y aplica las reglas de negocio
  */
 public class UsuarioService implements GenericService<Usuario> {
 
-    // DAOs inyectados. Necesitamos el DAO concreto de CredencialAcceso
-    // para el método auxiliar de vínculo.
-    private final GenericDao<Usuario> usuarioDao;
-    private final CredencialAccesoDAO credencialAccesoDao; // Necesario para el método vincularConUsuario
+    private UsuarioDAO usuarioDAO;
+    private CredencialAccesoDAO credencialDAO;
 
-    public UsuarioService(GenericDao<Usuario> usuarioDao, GenericDao<CredencialAcceso> credencialAccesoDao) {
-        if (usuarioDao == null || credencialAccesoDao == null || !(credencialAccesoDao instanceof CredencialAccesoDAO)) {
-            // Se valida que el DAO de CredencialAcceso sea la implementación concreta
-            throw new IllegalArgumentException("Los DAOs no pueden ser null y CredencialAccesoDAO debe ser la implementación concreta para gestionar la FK.");
-        }
-        this.usuarioDao = usuarioDao;
-        // Casteamos el GenericDao al tipo concreto para acceder a métodos específicos (vincularConUsuario)
-        this.credencialAccesoDao = (CredencialAccesoDAO) credencialAccesoDao; 
+    // Patron de regex simple para validación de email
+    private static final Pattern EMAIL_PATTERN = 
+            Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,6}$");
+
+    public UsuarioService() {
+        this.usuarioDAO = new UsuarioDAO();
+        this.credencialDAO = new CredencialAccesoDAO();
     }
 
     /**
-     * Inserta un nuevo Usuario y su CredencialAcceso asociado en una transacción.
-     * * REQUISITO TFI: Transacción obligatoria (commit/rollback).
+     * Validacion de campos de Usuario
+     */
+    private void validarUsuario(Usuario usuario) throws Exception {
+        if (usuario == null) {
+            throw new IllegalArgumentException("El usuario no puede ser nulo.");
+        }
+        if (usuario.getUsername() == null || usuario.getUsername().trim().isEmpty() || usuario.getUsername().length() > 30) {
+            throw new IllegalArgumentException("Username es obligatorio y debe tener máx. 30 caracteres.");
+        }
+        if (usuario.getEmail() == null || usuario.getEmail().trim().isEmpty()) {
+            throw new IllegalArgumentException("Email es obligatorio.");
+        }
+        if (!EMAIL_PATTERN.matcher(usuario.getEmail()).matches()) {
+            throw new IllegalArgumentException("Formato de email inválido.");
+        }
+    }
+    
+    /**
+     * Validacion de campos de Credencial
+     */
+    private void validarCredencial(CredencialAcceso credencial) throws Exception {
+         if (credencial == null) {
+            throw new IllegalArgumentException("La credencial no puede ser nula.");
+        }
+        if (credencial.getHashPassword() == null || credencial.getHashPassword().trim().isEmpty()) {
+            throw new IllegalArgumentException("El hashPassword es obligatorio.");
+        }
+        if (credencial.getSalt() == null || credencial.getSalt().trim().isEmpty()) {
+             throw new IllegalArgumentException("El salt es obligatorio.");
+        }
+    }
+
+    /**
+     * Inserta un Usuario y su CredencialAcceso asociada
+     * en una operacion transaccional compuesta
      */
     @Override
     public Usuario insertar(Usuario usuario) throws Exception {
+        //Validaciones de Reglas de Negocio
+        validarUsuario(usuario);
+        if (usuario.getCredencialId() == null) {
+            throw new IllegalArgumentException("El usuario debe tener una credencial asociada para ser creado.");
+        }
+        validarCredencial(usuario.getCredencialId());
+        
+        //Gestión de la Transaccion
         Connection conn = null;
         try {
-            // Establecer fecha de registro y activarlo por defecto (regla de negocio)
-            usuario.setFechaRegistro(LocalDateTime.now());
-            usuario.setActivo(true);
-            
-            // 1. Iniciar Conexión y Transacción
+            // Inicia transacción
             conn = DatabaseConnection.getConnection();
-            conn.setAutoCommit(false); // **Transacción ON**
+            conn.setAutoCommit(false);
 
-            // 2. Validaciones de Negocio
-            validateUsuario(usuario);
-            validateCredencial(usuario.getCredencial_id());
-
-            // 3. Insertar CredencialAcceso (B) primero para obtener su ID
-            CredencialAcceso credencial = usuario.getCredencial_id();
-            credencial = credencialAccesoDao.crear(credencial, conn); 
-
-            // 4. Insertar Usuario (A) y obtener su ID (PK autogenerada)
-            usuario = usuarioDao.crear(usuario, conn); 
-
-            // 5. Vincular B con A (usando el ID generado del Usuario)
-            credencialAccesoDao.vincularConUsuario(credencial.getId(), usuario.getId(), conn);
+            //Ejecutar operaciones compuestas (Crear B, luego A)
             
-            // Asignar el objeto Credencial completo al Usuario (para el objeto devuelto)
-            usuario.setCredencial_id(credencial);
+            // Paso B: Crear CredencialAcceso (B)
+            // El DAO (setGeneratedId) asignará el nuevo ID al objeto credencial
+            credencialDAO.crear(usuario.getCredencialId(), conn);
 
-            // 6. Commit (Si todas las operaciones fueron exitosas)
-            conn.commit(); 
-            return usuario;
+            // Paso A: Crear Usuario (A)
+            // El UsuarioDAO usara el ID de la credencial ya creada
+            usuarioDAO.crear(usuario, conn);
+
+            //Commit
+            conn.commit();
+            return usuario; // Devuelve el usuario con su ID y el ID de su credencial
             
         } catch (Exception e) {
-            // 7. Rollback (Si ocurre cualquier excepción)
+            //Rollback
             if (conn != null) {
                 try {
                     conn.rollback();
-                } catch (SQLException rollbackEx) {
-                    System.err.println("Error al realizar rollback: " + rollbackEx.getMessage());
+                } catch (SQLException se) {
+                    System.err.println("Error haciendo rollback: " + se.getMessage());
                 }
             }
-            throw new Exception("Fallo transaccional al crear Usuario y Credencial. Transacción revertida. Causa: " + e.getMessage(), e);
+            // Captura violaciones de unicidad
+            if (e.getMessage().contains("Duplicate entry") || e.getMessage().contains("UNIQUE constraint failed")) {
+                if (e.getMessage().contains("username")) {
+                     throw new Exception("Error: El 'username' ya existe.", e);
+                }
+                if (e.getMessage().contains("email")) {
+                     throw new Exception("Error: El 'email' ya existe.", e);
+                }
+                 if (e.getMessage().contains("credencial_id")) {
+                     throw new Exception("Error: La credencial ya está asignada a otro usuario (Fallo regla 1-1).", e);
+                }
+            }
+            throw new Exception("Error en Service al insertar usuario: " + e.getMessage(), e);
         } finally {
-            // 8. Cerrar recursos y restablecer auto-commit
+            //Restablecer y cerrar
             if (conn != null) {
                 try {
                     conn.setAutoCommit(true);
                     conn.close();
-                } catch (SQLException closeEx) {
-                    System.err.println("Error al cerrar conexión: " + closeEx.getMessage());
+                } catch (SQLException se) {
+                    System.err.println("Error cerrando conexión: " + se.getMessage());
                 }
             }
         }
     }
 
     /**
-     * Actualiza un Usuario y su CredencialAcceso asociado en una transacción.
-     * * REQUISITO TFI: Transacción obligatoria (commit/rollback).
+     * Actualiza un Usuario y, si es necesario, su CredencialAcceso asociada
+     * en una operacion transaccional
      */
     @Override
     public Usuario actualizar(Usuario usuario) throws Exception {
+        if (usuario.getId() == 0) {
+             throw new IllegalArgumentException("El usuario a actualizar debe tener un ID válido.");
+        }
+        validarUsuario(usuario);
+        
         Connection conn = null;
         try {
             conn = DatabaseConnection.getConnection();
-            conn.setAutoCommit(false); // **Transacción ON**
+            conn.setAutoCommit(false);
+
+            // Actualiza A (Usuario)
+            usuarioDAO.actualizar(usuario, conn);
             
-            // 1. Validaciones
-            validateUsuario(usuario);
-            
-            // 2. Actualizar Credencial (si existe y tiene ID)
-            if (usuario.getCredencial_id() != null && usuario.getCredencial_id().getId() > 0) {
-                validateCredencial(usuario.getCredencial_id());
-                credencialAccesoDao.actualizar(usuario.getCredencial_id(), conn);
+            // Actualiza B (CredencialAcceso) si existe
+            if (usuario.getCredencialId() != null && usuario.getCredencialId().getId() != 0) {
+                 validarCredencial(usuario.getCredencialId());
+                 credencialDAO.actualizar(usuario.getCredencialId(), conn);
             }
-            
-            // 3. Actualizar Usuario
-            usuario = usuarioDao.actualizar(usuario, conn);
-            
-            // 4. Commit
+
             conn.commit();
             return usuario;
+            
         } catch (Exception e) {
-            // 5. Rollback
-            if (conn != null) conn.rollback();
-            throw new Exception("Fallo transaccional al actualizar Usuario. Transacción revertida. Causa: " + e.getMessage(), e);
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException se) {
+                    System.err.println("Error haciendo rollback: " + se.getMessage());
+                }
+            }
+            throw new Exception("Error en Service al actualizar usuario: " + e.getMessage(), e);
         } finally {
-            // 6. Cerrar recursos
-            if (conn != null) { conn.setAutoCommit(true); conn.close(); }
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                } catch (SQLException se) {
+                    System.err.println("Error cerrando conexión: " + se.getMessage());
+                }
+            }
         }
     }
 
     /**
-     * Realiza una baja lógica del Usuario. Se asume que la BD (ON DELETE CASCADE) 
-     * o lógica adicional gestionará la Credencial.
+     * Realiza la baja logica del Usuario (A) y su CredencialAcceso (B)
+     * en una sola transaccion.
      */
     @Override
     public void eliminar(long id) throws Exception {
-        if (id <= 0) {
-            throw new IllegalArgumentException("El ID de eliminación debe ser un número positivo.");
-        }
-        try (Connection conn = DatabaseConnection.getConnection()) {
-            usuarioDao.eliminar(id, conn);
+        Connection conn = null;
+        try {
+            conn = DatabaseConnection.getConnection();
+            conn.setAutoCommit(false);
+
+            //Leer el usuario para encontrar su credencial asociada
+            // Usamos la misma conexion para asegurar lectura consistente
+            Usuario usuarioAEliminar = usuarioDAO.leer(id, conn);
+            
+            if (usuarioAEliminar == null) {
+                // Si el DAO devuelve null (porque no existe o ya esta eliminado)
+                throw new Exception("Usuario con ID: " + id + " no encontrado o ya eliminado.");
+            }
+
+            //Eliminar B (logicamente)
+            if (usuarioAEliminar.getCredencialId() != null) {
+                credencialDAO.eliminar(usuarioAEliminar.getCredencialId().getId(), conn);
+            }
+            
+            //Eliminar A (logicamente)
+            usuarioDAO.eliminar(id, conn);
+
+            conn.commit();
+            
         } catch (Exception e) {
-            throw new Exception("Error al realizar baja lógica de Usuario. Causa: " + e.getMessage(), e);
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException se) {
+                    System.err.println("Error haciendo rollback: " + se.getMessage());
+                }
+            }
+            throw new Exception("Error en Service al eliminar usuario: " + e.getMessage(), e);
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                } catch (SQLException se) {
+                    System.err.println("Error cerrando conexión: " + se.getMessage());
+                }
+            }
         }
     }
 
-    /**
-     * Busca un Usuario por su ID y carga su CredencialAcceso.
-     */
     @Override
     public Usuario getById(long id) throws Exception {
-        if (id <= 0) {
-            throw new IllegalArgumentException("El ID de búsqueda debe ser un número positivo.");
-        }
+        // Los DAO SELECT ya hacen el JOIN necesario
         try (Connection conn = DatabaseConnection.getConnection()) {
-            Usuario usuario = usuarioDao.leer(id, conn);
-            
-            // Lógica para cargar Credencial (se requeriría un método en DAO para buscar por FK: usuario_id)
-            // Por simplicidad del TFI, la carga del objeto B en el A puede dejarse pendiente,
-            // pero el Service tiene la responsabilidad de hacerlo.
-            
-            return usuario;
-        } catch (SQLException e) {
-            throw new Exception("Error al buscar Usuario por ID.", e);
+            return usuarioDAO.leer(id, conn);
+        } catch (Exception e) {
+            throw new Exception("Error en Service al obtener usuario por ID: " + e.getMessage(), e);
         }
     }
 
-    /**
-     * Obtiene todos los Usuarios activos.
-     */
     @Override
     public List<Usuario> getAll() throws Exception {
+        // Los DAO SELECT ya hacen el JOIN necesario
         try (Connection conn = DatabaseConnection.getConnection()) {
-            // Nota: Este método no carga las Credenciales asociadas por defecto
-            return usuarioDao.leerTodos(conn);
-        } catch (SQLException e) {
-            throw new Exception("Error al listar todos los Usuarios.", e);
+            return usuarioDAO.leerTodos(conn);
+        } catch (Exception e) {
+            throw new Exception("Error en Service al obtener todos los usuarios: " + e.getMessage(), e);
         }
-    }
-
-    /**
-     * Valida las reglas de negocio de la entidad Usuario.
-     */
-    private void validateUsuario(Usuario usuario) {
-        if (usuario == null) {
-            throw new IllegalArgumentException("El Usuario no puede ser null.");
-        }
-        // RN-004: Campos obligatorios y formato
-        if (usuario.getUsername() == null || usuario.getUsername().trim().isEmpty()) {
-            throw new IllegalArgumentException("RN-004: El nombre de usuario es obligatorio.");
-        }
-        if (usuario.getEmail() == null || !usuario.getEmail().contains("@") || usuario.getEmail().trim().isEmpty()) {
-            throw new IllegalArgumentException("RN-004: El formato del email es inválido o está vacío.");
-        }
-        // RN-005: Todo Usuario debe tener una CredencialAcceso
-        if (usuario.getCredencial_id() == null) {
-            throw new IllegalArgumentException("RN-005: Todo Usuario debe tener una CredencialAcceso asociada (relación 1:1).");
-        }
-        // *Falta* la validación de unicidad de username/email si la BD lo requiere.
     }
     
     /**
-     * Valida las reglas de negocio de la CredencialAcceso (delegado, pero aquí 
-     * se aplica como parte del Usuario).
+     * Obtiene un usuario por su username (busqueda especifica)
+     *
      */
-    private void validateCredencial(CredencialAcceso credencial) {
-        // RN-001: El hash de la contraseña debe ser un valor seguro (mínimo 10 caracteres)
-        if (credencial.getHashPassword() == null || credencial.getHashPassword().trim().length() < 10) {
-            throw new IllegalArgumentException("RN-001: El hash de la contraseña de la Credencial debe ser seguro (mínimo 10 caracteres).");
+    public Usuario getByUsername(String username) throws Exception {
+        // Las lecturas simples pueden gestionar su propia conexion
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            return usuarioDAO.buscarPorUsername(username, conn);
+        } catch (Exception e) {
+            throw new Exception("Error en Service al buscar por username: " + e.getMessage(), e);
         }
     }
 }

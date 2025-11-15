@@ -1,114 +1,177 @@
 package service;
 
 import config.DatabaseConnection;
-import dao.GenericDao;
+import dao.CredencialAccesoDAO;
 import entities.CredencialAcceso;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
 
 /**
- * Implementación del servicio de negocio para la entidad CredencialAcceso (B).
- * Es una capa delgada, ya que las operaciones transaccionales complejas (1:1)
- * son responsabilidad del UsuarioService.
- *
- * Responsabilidades:
- * - Aplicar validaciones de la entidad CredencialAcceso.
- * - Rechazar operaciones que deban ser transaccionales y centralizadas (insertar, eliminar).
- * - Delegar operaciones de lectura y actualización al DAO.
+ * Servicio para la entidad CredencialAcceso (BService).
+ * Gestiona las transacciones y validaciones de negocio.
  */
 public class CredencialAccesoService implements GenericService<CredencialAcceso> {
-    
-    // Inyección de dependencia del DAO
-    private final GenericDao<CredencialAcceso> credencialAccesoDao;
 
-    public CredencialAccesoService(GenericDao<CredencialAcceso> credencialAccesoDao) {
-        if (credencialAccesoDao == null) {
-            throw new IllegalArgumentException("CredencialAccesoDAO no puede ser null.");
+    private CredencialAccesoDAO credencialDAO;
+
+    public CredencialAccesoService() {
+        this.credencialDAO = new CredencialAccesoDAO();
+    }
+
+    /**
+     * Valida los campos obligatorios de una CredencialAcceso
+     */
+    private void validarCredencial(CredencialAcceso credencial) throws Exception {
+        if (credencial == null) {
+            throw new IllegalArgumentException("La credencial no puede ser nula.");
         }
-        this.credencialAccesoDao = credencialAccesoDao;
-    }
-
-    /**
-     * Inserta una nueva credencial en la base de datos.
-     * * REGLA DE NEGOCIO: La creación debe ser orquestada por UsuarioService
-     * * para asegurar la relación 1:1 transaccional.
-     * @throws UnsupportedOperationException Siempre, ya que la inserción está centralizada.
-     */
-    @Override
-    public CredencialAcceso insertar(CredencialAcceso entity) throws Exception {
-        throw new UnsupportedOperationException("La creación de CredencialAcceso debe realizarse a través de UsuarioService.insertar() para mantener la integridad de la relación 1:1.");
-    }
-
-    /**
-     * Actualiza un registro existente de CredencialAcceso.
-     *
-     * @param entity La credencial con los datos a actualizar.
-     * @return La credencial actualizada.
-     * @throws Exception Si hay error de conexión/BD o fallan las validaciones.
-     */
-    @Override
-    public CredencialAcceso actualizar(CredencialAcceso entity) throws Exception {
-        validateCredencial(entity);
-        try (Connection conn = DatabaseConnection.getConnection()) {
-            // El actualizar se realiza en una conexión no transaccional si es llamado directamente
-            return credencialAccesoDao.actualizar(entity, conn);
-        } catch (SQLException e) {
-            throw new Exception("Error al actualizar CredencialAcceso en la base de datos.", e);
+        if (credencial.getHashPassword() == null || credencial.getHashPassword().trim().isEmpty()) {
+            throw new IllegalArgumentException("El hashPassword es obligatorio.");
+        }
+        if (credencial.getSalt() == null || credencial.getSalt().trim().isEmpty()) {
+             throw new IllegalArgumentException("El salt es obligatorio.");
         }
     }
 
     /**
-     * Realiza una baja lógica de la CredencialAcceso por su ID.
-     * * REGLA DE NEGOCIO: La eliminación debe ser orquestada por UsuarioService
-     * * o por la restricción ON DELETE CASCADE de la BD.
-     * @throws UnsupportedOperationException Siempre, ya que la eliminación está centralizada.
+     * Inserta una credencial.
+     * NOTA: Este metodo NO debe usarse para el alta de Usuario (eso lo hace
+     * UsuarioService). Existe por coherencia de la interfaz GenericService.
+     */
+    @Override
+    public CredencialAcceso insertar(CredencialAcceso credencial) throws Exception {
+        validarCredencial(credencial);
+        
+        Connection conn = null;
+        try {
+            // Inicia transaccion
+            conn = DatabaseConnection.getConnection();
+            conn.setAutoCommit(false);
+
+            credencialDAO.crear(credencial, conn);
+
+            // Commit
+            conn.commit();
+            return credencial; // Devuelve la entidad con el ID asignado
+            
+        } catch (Exception e) {
+            // Rollback
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException se) {
+                    System.err.println("Error haciendo rollback: " + se.getMessage());
+                }
+            }
+            throw new Exception("Error en Service al insertar credencial: " + e.getMessage(), e);
+        } finally {
+            // Restablece autocommit y cierra
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                } catch (SQLException se) {
+                    System.err.println("Error cerrando conexión: " + se.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * Actualiza una credencial (ej. cambio de contraseña).
+     * Esta sí es una operacion transaccional valida para este servicio.
+     */
+    @Override
+    public CredencialAcceso actualizar(CredencialAcceso credencial) throws Exception {
+        if (credencial.getId() == 0) {
+             throw new IllegalArgumentException("La credencial a actualizar debe tener un ID válido.");
+        }
+        validarCredencial(credencial);
+        
+        Connection conn = null;
+        try {
+            conn = DatabaseConnection.getConnection();
+            conn.setAutoCommit(false);
+
+            credencialDAO.actualizar(credencial, conn);
+
+            conn.commit();
+            return credencial;
+            
+        } catch (Exception e) {
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException se) {
+                    System.err.println("Error haciendo rollback: " + se.getMessage());
+                }
+            }
+            throw new Exception("Error en Service al actualizar credencial: " + e.getMessage(), e);
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                } catch (SQLException se) {
+                    System.err.println("Error cerrando conexión: " + se.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * Elimina una credencial logicamente.
+     * NOTA: Esto no deberia llamarse directamente. Se debe llamar
+     * a UsuarioService.eliminar() para mantener la integridad transaccional.
      */
     @Override
     public void eliminar(long id) throws Exception {
-        throw new UnsupportedOperationException("La eliminación de CredencialAcceso debe realizarse a través de UsuarioService.eliminar() para mantener la integridad de la relación 1:1.");
+        Connection conn = null;
+        try {
+            conn = DatabaseConnection.getConnection();
+            conn.setAutoCommit(false);
+
+            credencialDAO.eliminar(id, conn); // Baja logica
+
+            conn.commit();
+            
+        } catch (Exception e) {
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException se) {
+                    System.err.println("Error haciendo rollback: " + se.getMessage());
+                }
+            }
+            throw new Exception("Error en Service al eliminar credencial: " + e.getMessage(), e);
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                } catch (SQLException se) {
+                    System.err.println("Error cerrando conexión: " + se.getMessage());
+                }
+            }
+        }
     }
 
-    /**
-     * Busca una CredencialAcceso por su ID.
-     */
     @Override
     public CredencialAcceso getById(long id) throws Exception {
-        if (id <= 0) {
-            throw new IllegalArgumentException("El ID de la Credencial debe ser un número positivo.");
-        }
         try (Connection conn = DatabaseConnection.getConnection()) {
-            return credencialAccesoDao.leer(id, conn);
-        } catch (SQLException e) {
-            throw new Exception("Error al buscar CredencialAcceso por ID.", e);
+            return credencialDAO.leer(id, conn);
+        } catch (Exception e) {
+            throw new Exception("Error en Service al obtener credencial por ID: " + e.getMessage(), e);
         }
     }
 
-    /**
-     * Obtiene una lista de todas las Credenciales de Acceso activas.
-     */
     @Override
     public List<CredencialAcceso> getAll() throws Exception {
         try (Connection conn = DatabaseConnection.getConnection()) {
-            return credencialAccesoDao.leerTodos(conn);
-        } catch (SQLException e) {
-            throw new Exception("Error al listar todas las Credenciales de Acceso.", e);
+            return credencialDAO.leerTodos(conn);
+        } catch (Exception e) {
+            throw new Exception("Error en Service al obtener todas las credenciales: " + e.getMessage(), e);
         }
-    }
-    
-    /**
-     * Valida que la credencial tenga datos correctos.
-     * @param credencial Credencial a validar
-     * @throws IllegalArgumentException Si alguna validación falla
-     */
-    private void validateCredencial(CredencialAcceso credencial) {
-        if (credencial == null) {
-            throw new IllegalArgumentException("La CredencialAcceso no puede ser null.");
-        }
-        // RN-001: El hash de la contraseña debe ser un valor seguro (mínimo 10 caracteres)
-        if (credencial.getHashPassword() == null || credencial.getHashPassword().trim().length() < 10) {
-            throw new IllegalArgumentException("RN-001: El hash de la contraseña debe ser un valor seguro (mínimo 10 caracteres).");
-        }
-        // No se requiere validar salt si puede ser null en BD, solo si se usa.
     }
 }
