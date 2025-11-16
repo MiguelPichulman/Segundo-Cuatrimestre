@@ -1,11 +1,11 @@
-package main;//interfaz de usuario
+package main;
 
 import service.CredencialAccesoService;
 import service.UsuarioService;
 import java.util.Scanner;
 
 /**
- * Orquestador principal del menu.
+ * Gestor principal del menu.
  * Gestiona el ciclo de vida del menu, inicializa servicios y el Scanner.
  */
 public class AppMenu {
@@ -25,13 +25,13 @@ public class AppMenu {
         UsuarioService usuarioService = new UsuarioService();
         CredencialAccesoService credencialService = new CredencialAccesoService();
         
-        //Inyecta dependencias en el Handler
+        //Las instancias se pasan al Handler para que pueda usarlas
         this.menuHandler = new MenuHandler(scanner, usuarioService, credencialService);
         this.running = true;
     }
 
     /**
-     * Loop principal del menu.
+     * Bucle principal del menu.
      */
     public void run() {
         while (running) {
@@ -40,7 +40,7 @@ public class AppMenu {
                 // Lee la línea completa para evitar problemas de buffer
                 String input = scanner.nextLine(); 
                 
-                // Intenta parsear la opcion
+                // Entrada de usuario limpia y  ejecuta la accion seleccionada
                 int opcion = Integer.parseInt(input.trim());
                 processOption(opcion);
                 

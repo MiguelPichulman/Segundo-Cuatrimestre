@@ -9,7 +9,8 @@ import java.util.List;
 import java.util.Scanner;
 
 /**
- * Controlador de las operaciones del menu (Menu Handler).
+ * Controlador de las operaciones del menu 
+ * Recibe la opcion desde AppMenu
  * Gestiona la logica de interaccion con el usuario y llama a los servicios.
  */
 public class MenuHandler {
@@ -39,7 +40,7 @@ public class MenuHandler {
             System.out.print("Contraseña: ");
             String password = scanner.nextLine().trim();
 
-            //Simular Hashing (En un TFI, esto es suficiente)
+            //Simular Hashing
             String salt = PasswordUtil.simularSalt();
             String hash = PasswordUtil.simularHash(password, salt);
 
@@ -67,10 +68,10 @@ public class MenuHandler {
 
         } catch (IllegalArgumentException e) {
             // Error de validación
-            System.err.println("❌ Error de Validacion: " + e.getMessage());
+            System.err.println("Error de Validacion: " + e.getMessage());
         } catch (Exception e) {
             // Error de BD (ej. Unicidad)
-            System.err.println("❌ Error de Base de Datos: " + e.getMessage());
+            System.err.println("Error de Base de Datos: " + e.getMessage());
         }
     }
 
@@ -203,7 +204,7 @@ public class MenuHandler {
     }
 
     /**
-     * Opcion 6: Búsqueda especifica por Username
+     * Opcion 6: Busqueda especifica por Username
      * (Busqueda por campo relevante)
      */
     public void buscarUsuarioPorUsername() {
